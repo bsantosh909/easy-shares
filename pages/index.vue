@@ -192,8 +192,29 @@
     </div>
 
     <!-- Footer -->
-    <div class="mt-10 w-full bg-green-800 p-3">
-      Footer
+    <div class="mt-10 w-full bg-green-800 p-3 text-center">
+      <p class="my-3">
+        <span> © 2021 </span>
+        <a
+          href="https://santoshb.com.np/"
+          target="_blank"
+          rel="noreferrer noopener"
+          class="text-blue-200 font-semibold"
+        >
+          Santosh Bhandari
+        </a>
+      </p>
+      <p class="my-3">
+        <span> All the date available in the website is thanks to </span>
+        <a
+          href="https://nepalstock.com/"
+          target="_blank"
+          rel="noreferrer noopener"
+          class="text-blue-200 font-semibold"
+        >
+          NEPSE!
+        </a>
+      </p>
     </div>
   </div>
 </template>
