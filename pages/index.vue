@@ -114,7 +114,7 @@
                 class="appearance-none w-full px-3 py-2 border font-semibold text-gray-900 border-gray-300 placeholder-gray-500 rounded-b-md focus:outline-none focus:z-10 sm:text-sm"
                 placeholder="Enter Name associated"
               >
-              <span v-if="hasError" class="block mt-2 text-sm text-red-400">
+              <span v-if="hasError" class="block mt-2 text-sm font-normal text-red-400">
                 {{ errorMsg }}
               </span>
               <button
@@ -138,16 +138,20 @@
       <!-- Result Section -->
       <section id="result" class="-mt-16 pt-24 min-h-screen text-center">
         <Observer
-          :active="!resultCompanies.length && !!users.length"
-          @intersect="loadAvailableResults"
+          :active="!capitalList.length"
+          @intersect="loadAvailableCapital"
         />
         <span class="text-3xl uppercase font-semibold"> Result </span>
+        <Observer
+          :active="!resultCompanies.length"
+          @intersect="loadAvailableResults"
+        />
         <div class="mt-10" align="center">
           <select
             id="companyID"
             v-model="resultCompany"
             class="text-gray-800 px-2 py-1 focus:outline-none rounded-sm w-96 block tracking-tighter"
-            :disabled="!users.length"
+            :disabled="!resultCompanies.length"
           >
             <option value="" disabled>
               Please Select one
@@ -161,17 +165,34 @@
               {{ comp.name }}
             </option>
           </select>
+          <!-- BOID input for result -->
+          <input
+            id="boid-for-result"
+            v-model="resultBoid"
+            type="text"
+            name="boid-for-result"
+            maxlength="16"
+            class="appearance-none mt-5 w-96 px-3 py-2 border font-semibold bg-gray-400 focus:bg-gray-200 text-gray-900 border-gray-300 placeholder-gray-600 rounded-md focus:outline-none focus:z-10 sm:text-sm"
+            placeholder="Enter 16 digit BOID"
+          >
+          <span v-if="hasError2" class="block mt-2 text-sm text-red-400">
+            {{ errorMsg2 }}
+          </span>
           <button
-            :disabled="!resultCompanies.length || !users.length || resultCompany === ''"
-            class="rounded-md font-semibold bg-blue-500 mt-5 px-3 py-2 sm:text-sm focus:outline-none"
-            :class="{ 'cursor-not-allowed opacity-50' : !resultCompanies.length || !users.length || resultCompany === '' }"
+            :disabled="!canCheckResult"
+            class="block rounded-md font-semibold bg-blue-500 mt-5 px-3 py-2 sm:text-sm focus:outline-none"
+            :class="{ 'cursor-not-allowed opacity-50' : !canCheckResult }"
             @click="checkResult"
           >
             Check
           </button>
           <div v-if="result.length" class="mt-16 text-left">
             <div v-for="(res, i) of result" :key="i" class="mt-5">
-              <span class="font-semibold"> • {{ res.name }} - {{ res.boid }} </span>
+              <div class="font-semibold">
+                <span> • </span>
+                <span v-if="res.name"> {{ res.name }} - </span>
+                <span> {{ res.boid }} </span>
+              </div>
               <div class="ml-5">
                 <div v-if="res.success">
                   <span> Congratulations!! 🎉 </span>
@@ -249,8 +270,20 @@ export default Vue.extend({
         boid: '',
         name: ''
       },
+      resultBoid: '',
       hasError: false,
-      errorMsg: ''
+      hasError2: false,
+      errorMsg: '',
+      errorMsg2: ''
+    }
+  },
+  computed: {
+    canCheckResult () {
+      // !resultCompanies.length || (!users.length || resultBoid === '' ) || resultCompany === ''
+      if (!this.resultCompanies.length) { return false }
+      if (this.resultCompany === '') { return false }
+      if (this.resultBoid === '' && !this.users.length) { return false }
+      return true
     }
   },
   mounted () {
@@ -289,7 +322,25 @@ export default Vue.extend({
         this.capitalList = []
       }
     },
+    async checkResultSingle (boid: string) {
+      try {
+        const validated = this.validateBOID(boid, false)
+        if (!validated) { return }
+
+        const { data } = await this.$axios.post('/ipo-result/result/result/check', {
+          companyShareId: this.resultCompany,
+          boid
+        })
+        this.result = [this.getShareResult(data, boid)]
+      } catch (err) {
+        this.result.push({
+          success: false,
+          boid
+        })
+      }
+    },
     async checkResult () {
+      if (this.resultBoid !== '') { return await this.checkResultSingle(this.resultBoid) }
       const users = this.users.map(usr => ({ boid: usr.boid, name: usr.name }))
       this.result = []
       for (const user of users) {
@@ -298,17 +349,7 @@ export default Vue.extend({
             companyShareId: this.resultCompany,
             boid: user.boid
           })
-          const obj = {
-            success: data.success,
-            name: user.name,
-            boid: user.boid,
-            units: 0
-          }
-          if (data.success === true) {
-            const regexMatch = data.message.match(/(\d+)/)
-            if (regexMatch) { obj.units = parseInt(regexMatch[0]) }
-          }
-          this.result.push(obj)
+          this.result.push(this.getShareResult(data, user.boid, user.name))
         } catch (err) {
           this.result.push({
             success: false,
@@ -318,13 +359,36 @@ export default Vue.extend({
         }
       }
     },
+    getShareResult (data: any, boid: string, name?: string) {
+      const obj = {
+        success: data.success as Boolean,
+        boid,
+        name,
+        units: 0
+      }
+      if (data.success === true) {
+        const regexMatch = data.message.match(/(\d+)/)
+        if (regexMatch) { obj.units = parseInt(regexMatch[0]) }
+      }
+      return obj
+    },
+    validateBOID (boid: string, firstError?: Boolean) {
+      if (boid.length !== 16) { return this.showError('Please Make sure the BOID is 16 digits long!') }
+      if (!boid.startsWith('130')) { return this.showError('Invalid BOID! Please check it again...') }
+      if (this.capitalList.length && !this.capitalList.map(cap => cap.code).includes(boid.slice(3, 8))) {
+        return this.showError('Invalid BOID! Please check the first 8 digits...', firstError)
+      }
+      this.hasError = false
+      this.hasError2 = false
+      this.errorMsg = ''
+      return true
+    },
     addUser (e: Event) {
       const boid = this.newUser.boid
       if (boid === '') { return }
-      if (boid.length < 16) { return this.showError('Please Make sure the BOID is 16 digit long!') }
-      // validate boid
-      if (!boid.startsWith('130')) { return this.showError('Invalid BOID! Please check it again...') }
-      if (this.capitalList.length && !this.capitalList.map(cap => cap.code).includes(boid.slice(3, 8))) { return this.showError('Invalid BOID! Please check the first 8 digits...') }
+
+      const validated = this.validateBOID(boid)
+      if (!validated) { return }
 
       const currentUsers = this.users
       if (currentUsers.filter(usr => usr.boid === boid).length) { return this.showError('User with same BOID already exists!') }
@@ -352,9 +416,14 @@ export default Vue.extend({
       this.users = remainingUser
       alert(`${user.name} with BOID ${user.boid} successfully removed!`)
     },
-    showError (msg: string) {
-      this.hasError = true
-      this.errorMsg = msg
+    showError (msg: string, first?: Boolean) {
+      if (first === false) {
+        this.hasError2 = true
+        this.errorMsg2 = msg
+      } else {
+        this.hasError = true
+        this.errorMsg = msg
+      }
     }
   }
 })
