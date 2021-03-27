@@ -41,3 +41,10 @@ If you like the project you can mail me at [mail address](mailto:contact@santosh
 If you think you can contribute to the project to make it better in any way then I would be more than happy and thankful.
 
 You can open a Pull Request if you make any changes to the code. Or you can open an Issue to let me know about any improvements you would love to see.
+
+## Project links
+
+- [Live Website](https://shares.santoshb.com.np)
+- [Project's github Link](https://github.com/TheLearneer/easy-shares)
+- [Proxy API Link](https://nepalstock.com/)
+  - It is possible thanks to Repl.it
